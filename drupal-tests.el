@@ -45,6 +45,43 @@
 
 
 
+(ert-deftest drupal--hook-base-name ()
+  "Test `drupal--hook-base-name'."
+  (should
+   (string=
+    (drupal--hook-base-name "hook_foo")
+    "foo"))
+
+  (let ((drupal-symbol-collection nil))
+    (should
+     (string=
+      (drupal--hook-base-name "somemodule_foo_bar_baz")
+      "foo_bar_baz")))
+
+  (let ((drupal-module "my_custom_module"))
+    (should
+     (string=
+      (drupal--hook-base-name "my_custom_module_menu_alter")
+      "menu_alter")))
+
+  (let ((drupal-symbol-collection
+         '("hook_something" "hook_something_else" "hook_thing_alter")))
+    (should
+     (string=
+      (drupal--hook-base-name "my_module_something_else")
+      "something_else"))
+
+    (should
+     (string=
+      (drupal--hook-base-name "my_long_module2_thing_alter")
+      "thing_alter"))
+
+    (should
+     (string=
+      (drupal--hook-base-name "mymodule_undocumented_hook")
+      "undocumented_hook"))))
+
+
 (provide 'drupal-tests)
 
 ;; Local Variables:

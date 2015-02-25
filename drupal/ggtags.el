@@ -40,7 +40,9 @@ Include path to the executable if it is not in your $PATH.")
       ;; completion
       (setq drupal-symbol-collection
             (lambda () (all-completions "" ggtags-completion-table)))
-      (setq drupal-get-function-args #'drupal/ggtags-get-function-args))))
+      (setq drupal-get-function-args #'drupal/ggtags-get-function-args)
+      (setq drupal-apropos-function #'drupal/ggtags-apropos)
+      (setq drupal-grep-function #'ggtags-grep))))
 
 (defun drupal/ggtags-get-function-args (symbol &optional version)
   "Get function arguments from GNU GLOBAL."
@@ -52,6 +54,9 @@ Include path to the executable if it is not in your $PATH.")
         (goto-char (point-min))
         (search-forward-regexp "[^(]*(\\(.*\\))[^)]*" nil t)
         (match-string-no-properties 1)))))
+
+(defun drupal/ggtags-apropos (fragment)
+  (ggtags-find-tag-regexp (concat ".*" fragment ".*")))
 
 (add-hook 'drupal-mode-hook #'drupal/ggtags-enable)
 

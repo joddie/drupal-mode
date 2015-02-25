@@ -41,7 +41,8 @@
       ;; Set `drupal-symbol-collection' to `tags-completion-table' so
       ;; that inserting hooks will do completion based on etags.
       (setq drupal-get-function-args #'drupal/etags-get-function-args)
-      (setq drupal-symbol-collection #'tags-completion-table))))
+      (setq drupal-symbol-collection #'tags-completion-table)
+      (setq drupal-apropos-function #'tags-apropos))))
 
 (defun drupal/etags-get-function-args (symbol &optional version)
   "Get function arguments from etags TAGS."

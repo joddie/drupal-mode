@@ -239,7 +239,9 @@ get better filling in Doxygen comments."
     (?f . drupal-insert-function)
     (?m . drupal-module-name)
     (?e . drupal-drush-php-eval)
-    (?t . drupal-wrap-string-in-t-function))
+    (?t . drupal-wrap-string-in-t-function)
+    (?i . drupal-who-implements)
+    (?w . drupal-who-invokes))
   "Map of mnemonic keys and functions for keyboard shortcuts.
 See `drupal-mode-map'.")
 
@@ -271,6 +273,12 @@ See `drupal-get-function-args' (slow)
 `drupal/gtags-get-function-args' for functions returning Drupal
 function arguments.")
 (make-variable-buffer-local 'drupal-get-function-args)
+
+(defvar drupal-apropos-function nil)
+(make-variable-buffer-local 'drupal-apropos-function)
+
+(defvar drupal-grep-function #'drupal-rgrep)
+(make-variable-buffer-local 'drupal-grep-function)
 
 
 
@@ -414,6 +422,12 @@ of the project)."
   [menu-bar drupal php-eval]
   '(menu-item "PHP Evaluate active region" drupal-drush-php-eval
               :enable (and (use-region-p) drupal-rootdir drupal-drush-program)))
+(define-key drupal-mode-map
+    [menu-bar drupal who-invokes]
+  '("Find hook invocations..." . drupal-who-invokes))
+(define-key drupal-mode-map
+    [menu-bar drupal who-implements]
+  '("Find hook implementations..." . drupal-who-implements))
 (define-key drupal-mode-map
     [menu-bar drupal insert-hook]
   '("Insert hook implementation" . drupal-insert-hook))
@@ -672,6 +686,100 @@ Heavily based on `message-beginning-of-line' from Gnus."
          (if (and eoh (or (< eoh here) (= bol here)))
              eoh bol)))
     (beginning-of-line n)))
+
+;; Basic cross-reference functions using tags and regexp search
+
+(defun drupal-who-implements (hook-name)
+  "List implementations of the Drupal hook HOOK-NAME in current project.
+
+HOOK-NAME is the name of the Drupal hook (a string beginning with
+\"hook_\").  Interactively, reads the hook name from the
+minibuffer, suggesting a default based on the symbol nearest
+point."
+  (interactive (list (drupal-read-hook)))
+  (unless drupal-apropos-function
+    (error "No `drupal-apropos-function'.  Try creating a TAGS or GTAGS file for this project."))
+  (funcall drupal-apropos-function (drupal--hook-base-name hook-name)))
+
+(defun drupal-who-invokes (hook-name)
+  "List invocations of the Drupal hook HOOK-NAME in the current project.
+
+HOOK-NAME is the name of a Drupal hook (a string beginning with
+\"hook_\").  Interactively, reads the hook name from the
+minibuffer, suggesting a default based on the symbol nearest
+point.
+
+Hook invocations are found using a simple regexp search for calls
+to \"module_invoke\", \"module_invoke_all\" or \"drupal_alter\"
+on the same line as HOOK-NAME, strippped of any preceding
+\"hook_\" and trailing \"_alter\" components.  This will not
+necessarily find all possible calls to HOOK-NAME if it is called
+in some nonstandard manner."
+  (interactive (list (drupal-read-hook)))
+  (let* ((hook-base-name (drupal--hook-base-name hook-name))
+         (regexp
+          (if (string-suffix-p "alter" hook-base-name)
+              (format "drupal_alter.*['\"]%s['\"]"
+                      (regexp-quote (substring hook-base-name 0 -6)))
+            (format "module_invoke.*['\"]%s['\"]"
+                    (regexp-quote hook-base-name)))))
+    (funcall drupal-grep-function regexp)))
+
+(defun drupal-rgrep (regexp)
+  "Search for REGEXP in all PHP files in the current project.
+This is the default implementation of `drupal-grep-function'."
+  (unless drupal-rootdir
+    (error "Unable to search due to null `drupal-rootdir'."))
+  (rgrep regexp "*" drupal-rootdir))
+
+(defvar drupal-read-hook-history nil
+  "Minibuffer history for `drupal-read-hook'.")
+
+(defun drupal-read-hook ()
+  "Read a Drupal hook name from the minibuffer with completion."
+  (let* ((symbol-at-point (thing-at-point 'symbol))
+         (default
+          (and symbol-at-point
+               (concat "hook_" (drupal--hook-base-name symbol-at-point))))
+         (prompt
+          (if default
+              (format "Hook (default `%s'): " default)
+            "Hook: "))
+         (completion-table
+          (if (functionp drupal-symbol-collection)
+              (funcall drupal-symbol-collection)
+            drupal-symbol-collection)))
+    (completing-read prompt
+                     completion-table
+                     nil nil nil 'drupal-read-hook-history default)))
+
+(defun drupal--hook-base-name (symbol)
+  (cond
+    ((string-match-p "\\`hook_" symbol)
+     (substring symbol 5))
+
+    ((and drupal-module
+          (string-prefix-p drupal-module symbol))
+     (substring symbol (+ 1 (length drupal-module))))
+
+    (drupal-symbol-collection
+     (let* ((symbols
+             (if (functionp drupal-symbol-collection)
+                 (funcall drupal-symbol-collection)
+               drupal-symbol-collection))
+            (hook-base-names
+             (cl-loop for symbol in symbols
+                      if (string-match-p "\\`hook_" symbol)
+                      collect (substring symbol 5))))
+       (or
+        (cl-loop for hook-base-name in hook-base-names
+                 if (string-suffix-p hook-base-name symbol)
+                 return hook-base-name)
+        (replace-regexp-in-string "\\`[[:alnum:]]+_" "" symbol))))
+
+    (t
+     (replace-regexp-in-string "\\`[[:alnum:]]+_" "" symbol))))
+
 
 
 
