@@ -696,7 +696,7 @@ HOOK-NAME is the name of the Drupal hook (a string beginning with
 \"hook_\").  Interactively, reads the hook name from the
 minibuffer, suggesting a default based on the symbol nearest
 point."
-  (interactive (list (drupal-read-hook)))
+  (interactive (list (drupal-read-hook "Find implementations of: ")))
   (unless drupal-apropos-function
     (error "No `drupal-apropos-function'.  Try creating a TAGS or GTAGS file for this project."))
   (funcall drupal-apropos-function (drupal--hook-base-name hook-name)))
@@ -715,7 +715,7 @@ on the same line as HOOK-NAME, strippped of any preceding
 \"hook_\" and trailing \"_alter\" components.  This will not
 necessarily find all possible calls to HOOK-NAME if it is called
 in some nonstandard manner."
-  (interactive (list (drupal-read-hook)))
+  (interactive (list (drupal-read-hook "Find invocations of: ")))
   (let* ((hook-base-name (drupal--hook-base-name hook-name))
          (regexp
           (if (string-suffix-p "alter" hook-base-name)
@@ -735,23 +735,25 @@ This is the default implementation of `drupal-grep-function'."
 (defvar drupal-read-hook-history nil
   "Minibuffer history for `drupal-read-hook'.")
 
-(defun drupal-read-hook ()
+(defun drupal-read-hook (prompt)
   "Read a Drupal hook name from the minibuffer with completion."
   (let* ((symbol-at-point (thing-at-point 'symbol))
          (default
           (and symbol-at-point
-               (concat "hook_" (drupal--hook-base-name symbol-at-point))))
+              (concat "hook_" (drupal--hook-base-name symbol-at-point))))
          (prompt
           (if default
-              (format "Hook (default `%s'): " default)
-            "Hook: "))
+              (format "%s (default `%s'): "
+                      (replace-regexp-in-string ": $" "" prompt)
+                      default)
+            prompt))
          (completion-table
           (if (functionp drupal-symbol-collection)
               (funcall drupal-symbol-collection)
             drupal-symbol-collection)))
     (completing-read prompt
                      completion-table
-                     nil nil nil 'drupal-read-hook-history default)))
+                     nil nil "hook_" 'drupal-read-hook-history default)))
 
 (defun drupal--hook-base-name (symbol)
   (cond
